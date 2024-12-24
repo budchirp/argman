@@ -11,14 +11,10 @@ using namespace std;
 
 namespace ArgMan {
 
-enum class OptionType { STRING, INTEGER, BOOLEAN };
-
 class OptionBase {
 public:
   string name;
   string description;
-
-  OptionType type;
 
   virtual void parse(const string value) = 0;
   virtual ~OptionBase() = default;
@@ -28,12 +24,10 @@ template <typename T> class Option : public OptionBase {
 public:
   T value;
 
-  Option(const string name, const string description, OptionType type,
+  Option(const string name, const string description,
          T default_value) {
     this->name = name;
     this->description = description;
-
-    this->type = type;
 
     this->value = default_value;
   }

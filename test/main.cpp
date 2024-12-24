@@ -1,17 +1,3 @@
-<div align="center">
-    <h1>argman</h1>
-    <h2>Small C++ (C++20) library for basic command line argument parsing</h2>
-</div>
-
-<div align="center">
-  <img alt="Stargazers" src="https://img.shields.io/github/stars/budchirp/argman?style=for-the-badge&colorA=0b1221&colorB=ff8e8e" />
-  <img alt="Last commit" src="https://img.shields.io/github/last-commit/budchirp/argman?style=for-the-badge&colorA=0b1221&colorB=BDB0E4" />
-  <img alt="Issues" src="https://img.shields.io/github/issues/budchirp/argman?style=for-the-badge&colorA=0b1221&colorB=FBC19D" />
-</div>
-
-## Usage
-
-```cpp
 #include "argman.hpp"
 
 #include <iostream>
@@ -52,4 +38,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-```
