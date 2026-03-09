@@ -1,172 +1,195 @@
-#include "argman.hpp"
+#include <exception>
+#include <print>
+#include <string>
+#include <vector>
 
-using namespace ArgMan;
+import argman;
 
-class BuildCommand : public Command {
-public:
-  string name() const override { return "build"; }
-  string description() const override { return "Build the project"; }
+class BuildCommand : public argman::Command {
+  public:
+    std::string name() const override { return "build"; }
+    std::string description() const override { return "Build the project"; }
 
-  vector<Option> options() const override {
-    return {{"ldflags", "Linker flags", "string", false, ""},
-            {"debug", "Enable debug mode", "bool", true, "false"},
-            {"jobs", "Number of parallel jobs", "int", false, "1"}};
-  }
-
-  void execute() override {
-    cout << "Building project...\n";
-    cout << "Debug: "
-         << (get_option_value<bool>("debug") ? "enabled" : "disabled") << "\n";
-    cout << "LDFLAGS: " << get_option_value<string>("ldflags") << "\n";
-    cout << "Jobs: " << get_option_value<int>("jobs") << "\n";
-
-    if (!positional_args.empty()) {
-      cout << "Targets: ";
-      for (const auto &target : positional_args) {
-        cout << target << " ";
-      }
-      cout << "\n";
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("ldflags", "Linker flags", std::string("")),
+                argman::Option("debug", "Enable debug mode", false, true),
+                argman::Option("jobs", "Number of parallel jobs", 1)};
     }
-  }
-};
 
-class CleanCommand : public Command {
-public:
-  string name() const override { return "clean"; }
-  string description() const override { return "Clean build artifacts"; }
+    void execute() override {
+        std::println("Building project...");
+        std::println("Debug: {}", get<bool>("debug") ? "enabled" : "disabled");
+        std::println("LDFLAGS: {}", get<std::string>("ldflags"));
+        std::println("Jobs: {}", get<int>("jobs"));
 
-  vector<Option> options() const override {
-    return {{"force", "Force clean all files", "bool", true, "false"}};
-  }
-
-  void execute() override {
-    cout << "Cleaning project...\n";
-    if (get_option_value<bool>("force")) {
-      cout << "Force clean enabled\n";
+        for (const auto& argument : get_arguments()) {
+            std::println("Target: {}", argument);
+        }
     }
-  }
 };
 
-class TestRunCommand : public Command {
-public:
-  string name() const override { return "run"; }
-  string description() const override { return "Run unit tests"; }
+class CleanCommand : public argman::Command {
+  public:
+    std::string name() const override { return "clean"; }
+    std::string description() const override { return "Clean build artifacts"; }
 
-  vector<Option> options() const override {
-    return {{"verbose", "Verbose test output", "bool", true, "false"},
-            {"filter", "Test filter pattern", "string", false, ""}};
-  }
-
-  void execute() override {
-    cout << "Running tests...\n";
-    if (get_option_value<bool>("verbose")) {
-      cout << "Verbose output enabled\n";
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("force", "Force clean all files", false, true)};
     }
-    if (auto filter = get_option_value<string>("filter"); !filter.empty()) {
-      cout << "Filter: " << filter << "\n";
+
+    void execute() override {
+        std::println("Cleaning project...");
+        if (get<bool>("force")) {
+            std::println("Force clean enabled");
+        }
     }
-  }
 };
 
-class TestBenchCommand : public Command {
-public:
-  string name() const override { return "bench"; }
-  string description() const override { return "Run benchmarks"; }
+class TestRunCommand : public argman::Command {
+  public:
+    std::string name() const override { return "run"; }
+    std::string description() const override { return "Run unit tests"; }
 
-  vector<Option> options() const override {
-    return {
-        {"iterations", "Number of benchmark iterations", "int", false, "100"}};
-  }
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("verbose", "Verbose test output", false, true),
+                argman::Option("filter", "Test filter pattern", std::string(""))};
+    }
 
-  void execute() override {
-    cout << "Running benchmarks...\n";
-    cout << "Iterations: " << get_option_value<int>("iterations") << "\n";
-  }
+    void execute() override {
+        std::println("Running tests...");
+        if (get<bool>("verbose")) {
+            std::println("Verbose output enabled");
+        }
+        if (auto filter = get<std::string>("filter"); !filter.empty()) {
+            std::println("Filter: {}", filter);
+        }
+    }
 };
 
-class TestCommand : public Command {
-public:
-  string name() const override { return "test"; }
-  string description() const override { return "Run tests and benchmarks"; }
+class TestBenchCommand : public argman::Command {
+  public:
+    std::string name() const override { return "bench"; }
+    std::string description() const override { return "Run benchmarks"; }
 
-  void init() override {
-    add_command(make_shared<TestRunCommand>());
-    add_command(make_shared<TestBenchCommand>());
-  }
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("iterations", "Number of benchmark iterations", 100)};
+    }
 
-  void execute() override {
-    cout << "Test command requires a subcommand. Use --help for available "
-            "options.\n";
-  }
+    void execute() override {
+        std::println("Running benchmarks...");
+        std::println("Iterations: {}", get<int>("iterations"));
+    }
 };
 
-class DocGenerateCommand : public Command {
-public:
-  string name() const override { return "generate"; }
-  string description() const override { return "Generate documentation"; }
+class TestCommand : public argman::Command {
+  private:
+    TestRunCommand run_command;
+    TestBenchCommand bench_command;
 
-  vector<Option> options() const override {
-    return {{"format", "Output format", "string", false, "html"},
-            {"output", "Output directory", "string", false, "docs/"}};
-  }
+  public:
+    std::string name() const override { return "test"; }
+    std::string description() const override { return "Run tests and benchmarks"; }
 
-  void execute() override {
-    cout << "Generating documentation...\n";
-    cout << "Format: " << get_option_value<string>("format") << "\n";
-    cout << "Output: " << get_option_value<string>("output") << "\n";
-  }
+    void init() override {
+        add_command(run_command);
+        add_command(bench_command);
+    }
+
+    void execute() override {
+        std::println("Test command requires a subcommand. Use --help for available options.");
+    }
 };
 
-class DocServeCommand : public Command {
-public:
-  string name() const override { return "serve"; }
-  string description() const override { return "Serve documentation locally"; }
+class DocGenerateCommand : public argman::Command {
+  public:
+    std::string name() const override { return "generate"; }
+    std::string description() const override { return "Generate documentation"; }
 
-  vector<Option> options() const override {
-    return {{"host", "Server host", "string", false, "localhost"},
-            {"port", "Server port", "int", false, "8080"}};
-  }
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("format", "Output format", std::string("html")),
+                argman::Option("output", "Output directory", std::string("docs/"))};
+    }
 
-  void execute() override {
-    cout << "Serving documentation...\n";
-    cout << "Host: " << get_option_value<string>("host") << "\n";
-    cout << "Port: " << get_option_value<int>("port") << "\n";
-  }
+    void execute() override {
+        std::println("Generating documentation...");
+        std::println("Format: {}", get<std::string>("format"));
+        std::println("Output: {}", get<std::string>("output"));
+    }
 };
 
-class DocCommand : public Command {
-public:
-  string name() const override { return "doc"; }
-  string description() const override { return "Documentation utilities"; }
+class DocServeCommand : public argman::Command {
+  public:
+    std::string name() const override { return "serve"; }
+    std::string description() const override { return "Serve documentation locally"; }
 
-  void init() override {
-    add_command(make_shared<DocGenerateCommand>());
-    add_command(make_shared<DocServeCommand>());
-  }
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("host", "Server host", std::string("localhost")),
+                argman::Option("port", "Server port", 8080)};
+    }
 
-  void execute() override {
-    cout << "Documentation command requires a subcommand. Use --help for "
-            "available options.\n";
-  }
+    void execute() override {
+        std::println("Serving documentation...");
+        std::println("Host: {}", get<std::string>("host"));
+        std::println("Port: {}", get<int>("port"));
+    }
 };
 
-int main(int argc, char *argv[]) {
-  auto parser = CommandLineParser(
-      "argman", "A modern C++ argument parsing library",
-      {{"verbose", "Enable verbose output", "bool", true, "false"},
-       {"config", "Configuration file path", "string", false, "config.json"}});
+class DocCommand : public argman::Command {
+  private:
+    DocGenerateCommand generate_command;
+    DocServeCommand serve_command;
 
-  parser.add_command(make_shared<BuildCommand>());
-  parser.add_command(make_shared<CleanCommand>());
-  parser.add_command(make_shared<TestCommand>());
-  parser.add_command(make_shared<DocCommand>());
+  public:
+    std::string name() const override { return "doc"; }
+    std::string description() const override { return "Documentation utilities"; }
 
-  try {
-    parser.parse(argc, argv);
-  } catch (const exception &e) {
-    cerr << parser.app_name << ": error: " << e.what() << "\n";
-    return 1;
-  }
+    void init() override {
+        add_command(generate_command);
+        add_command(serve_command);
+    }
 
-  return 0;
+    void execute() override {
+        std::println(
+            "Documentation command requires a subcommand. Use --help for available options.");
+    }
+};
+
+class RootCommand : public argman::Command {
+  private:
+    BuildCommand build_command;
+    CleanCommand clean_command;
+    TestCommand test_command;
+    DocCommand doc_command;
+
+  public:
+    std::string name() const override { return "argman"; }
+    std::string description() const override { return "A modern C++ argument parsing library"; }
+
+    std::vector<argman::Option> init_options() const override {
+        return {argman::Option("verbose", "Enable verbose output", false, true),
+                argman::Option("config", "Configuration file path", std::string("config.json"))};
+    }
+
+    void init() override {
+        add_command(build_command);
+        add_command(clean_command);
+        add_command(test_command);
+        add_command(doc_command);
+    }
+
+    void execute() override { show_help(); }
+};
+
+int main(int argc, char* argv[]) {
+    RootCommand root;
+    argman::CommandLineParser parser(root);
+
+    try {
+        parser.parse(argc, argv);
+    } catch (const std::exception& e) {
+        std::println(stderr, "{}: error: {}", root.name(), e.what());
+        return 1;
+    }
+
+    return 0;
 }

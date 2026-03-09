@@ -1,42 +1,52 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 
-project(argman 
+project(argman
     VERSION 1.0.0
     DESCRIPTION "A modern C++ argument parsing library with subcommand support"
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ARGMAN_BUILD_EXAMPLE "Build example executable" OFF)
 
-add_library(${PROJECT_NAME} INTERFACE)
-add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+add_library(${PROJECT_NAME} STATIC)
 
-target_include_directories(${PROJECT_NAME} 
-    INTERFACE 
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+target_sources(${PROJECT_NAME}
+    PUBLIC FILE_SET CXX_MODULES FILES
+        src/argman.cppm
+        src/argman/option.cppm
+        src/argman/command.cppm
+        src/argman/parser.cppm
 )
 
-target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
+target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+)
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported)
+if(ipo_supported)
+    set_target_properties(${PROJECT_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
 
 if(ARGMAN_BUILD_EXAMPLE)
     add_executable(${PROJECT_NAME}_example test/main.cpp)
     target_link_libraries(${PROJECT_NAME}_example PRIVATE ${PROJECT_NAME})
-    
+
     set_target_properties(${PROJECT_NAME}_example PROPERTIES
         OUTPUT_NAME "argman_example"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
     )
-    
-    target_compile_options(${PROJECT_NAME}_example PRIVATE 
-        -Wall -Wextra -Wpedantic
-    )
-endif()
 
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-    add_compile_options(-fdiagnostics-color=always)
+    target_compile_options(${PROJECT_NAME}_example PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+    )
+
+    if(ipo_supported)
+        set_target_properties(${PROJECT_NAME}_example PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    endif()
 endif()

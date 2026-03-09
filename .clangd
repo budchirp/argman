@@ -1,0 +1,7 @@
+CompileFlags:
+  CompilationDatabase: cmake-build-debug
+  
+InlayHints:
+  Enabled: true
+  Designators: true
+  DeducedTypes: true

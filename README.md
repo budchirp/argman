@@ -1,6 +1,6 @@
 <div align="center">
     <h1>ArgMan</h1>
-    <h2>Modern C++20 argument parsing library with subcommand support</h2>
+    <h2>Modern C++26 argument parsing library with subcommand support</h2>
 </div>
 
 <div align="center">
@@ -15,109 +15,141 @@
 - **Subcommand Support** - Nested subcommands with individual options and help
 - **Type Safety** - Built-in support for `string`, `int`, `bool`, `float`, `double`
 - **Automatic Help** - Generated help messages for all commands and subcommands
-- **Global Options** - Options that work across all commands
-- **Modern C++20** - Uses latest C++ features for clean, efficient code
-- **Header-only** - Easy integration with CMake projects
+- **Global Options** - Options defined on the root command work across all commands
+- **Modern C++26** - Uses C++26 modules for clean, fast builds
+- **Static library** - Easy integration with CMake projects
 
 ## Quick Start
 
 ### Basic Command
 
 ```cpp
-#include "argman.hpp"
+#include <print>
 
-using namespace ArgMan;
+import argman;
 
-class BuildCommand : public Command {
+class BuildCommand : public argman::Command {
 public:
-  string name() const override { return "build"; }
-  string description() const override { return "Build the project"; }
-  
-  vector<Option> options() const override {
-    return {
-      {"debug", "Enable debug mode", "bool", true, "false"},
-      {"jobs", "Number of parallel jobs", "int", false, "1"}
-    };
-  }
+    std::string name() const override { return "build"; }
+    std::string description() const override { return "Build the project"; }
 
-  void execute() override {
-    cout << "Building project...\n";
-    cout << "Debug: " << (get_option_value<bool>("debug") ? "enabled" : "disabled") << "\n";
-    cout << "Jobs: " << get_option_value<int>("jobs") << "\n";
-  }
+    std::vector<argman::Option> init_options() const override {
+        return {
+            argman::Option("debug", "Enable debug mode", false, true),
+            argman::Option("jobs", "Number of parallel jobs", 1)
+        };
+    }
+
+    void execute() override {
+        std::println("Building project...");
+        std::println("Debug: {}", get<bool>("debug") ? "enabled" : "disabled");
+        std::println("Jobs: {}", get<int>("jobs"));
+    }
+};
+
+class RootCommand : public argman::Command {
+private:
+    BuildCommand build_command;
+
+public:
+    std::string name() const override { return "myapp"; }
+    std::string description() const override { return "My application"; }
+
+    void init() override {
+        add_command(build_command);
+    }
+
+    void execute() override { show_help(); }
 };
 
 int main(int argc, char* argv[]) {
-  auto parser = CommandLineParser("myapp", "My application");
-  parser.add_command(make_shared<BuildCommand>());
-  
-  try {
-    parser.parse(argc, argv);
-  } catch (const exception& e) {
-    cerr << parser.app_name << ": error: " << e.what() << "\n";
-    return 1;
-  }
-  
-  return 0;
+    RootCommand root;
+    argman::CommandLineParser parser(root);
+
+    try {
+        parser.parse(argc, argv);
+    } catch (const std::exception& e) {
+        std::println(stderr, "{}: error: {}", root.name(), e.what());
+        return 1;
+    }
+
+    return 0;
 }
 ```
 
 ### With Subcommands
 
 ```cpp
-class TestRunCommand : public Command {
+class TestRunCommand : public argman::Command {
 public:
-  string name() const override { return "run"; }
-  string description() const override { return "Run unit tests"; }
-  
-  vector<Option> options() const override {
-    return {
-      {"verbose", "Verbose output", "bool", true, "false"},
-      {"filter", "Test filter pattern", "string", false, ""}
-    };
-  }
+    std::string name() const override { return "run"; }
+    std::string description() const override { return "Run unit tests"; }
 
-  void execute() override {
-    cout << "Running tests...\n";
-    if (get_option_value<bool>("verbose")) {
-      cout << "Verbose mode enabled\n";
+    std::vector<argman::Option> init_options() const override {
+        return {
+            argman::Option("verbose", "Verbose output", false, true),
+            argman::Option("filter", "Test filter pattern", std::string(""))
+        };
     }
-  }
+
+    void execute() override {
+        std::println("Running tests...");
+        if (get<bool>("verbose")) {
+            std::println("Verbose mode enabled");
+        }
+    }
 };
 
-class TestCommand : public Command {
-public:
-  string name() const override { return "test"; }
-  string description() const override { return "Test commands"; }
-  
-  void init() override {
-    add_command(make_shared<TestRunCommand>());
-  }
+class TestCommand : public argman::Command {
+private:
+    TestRunCommand run_command;
 
-  void execute() override {
-    cout << "Use 'test --help' to see available subcommands.\n";
-  }
+public:
+    std::string name() const override { return "test"; }
+    std::string description() const override { return "Test commands"; }
+
+    void init() override {
+        add_command(run_command);
+    }
+
+    void execute() override {
+        std::println("Use 'test --help' to see available subcommands.");
+    }
 };
 ```
 
 ### With Global Options
 
 ```cpp
-int main(int argc, char* argv[]) {
-  auto parser = CommandLineParser(
-    "myapp",
-    "My application with global options",
-    {
-      {"verbose", "Enable verbose output", "bool", true, "false"},
-      {"config", "Configuration file", "string", false, "config.json"}
+class RootCommand : public argman::Command {
+private:
+    BuildCommand build_command;
+    TestCommand test_command;
+
+public:
+    std::string name() const override { return "myapp"; }
+    std::string description() const override { return "My application with global options"; }
+
+    std::vector<argman::Option> init_options() const override {
+        return {
+            argman::Option("verbose", "Enable verbose output", false, true),
+            argman::Option("config", "Configuration file", std::string("config.json"))
+        };
     }
-  );
-  
-  parser.add_command(make_shared<BuildCommand>());
-  parser.add_command(make_shared<TestCommand>());
-  
-  parser.parse(argc, argv);
-  return 0;
+
+    void init() override {
+        add_command(build_command);
+        add_command(test_command);
+    }
+
+    void execute() override { show_help(); }
+};
+
+int main(int argc, char* argv[]) {
+    RootCommand root;
+    argman::CommandLineParser parser(root);
+    parser.parse(argc, argv);
+    return 0;
 }
 ```
 
@@ -126,11 +158,8 @@ int main(int argc, char* argv[]) {
 ### As a Subdirectory
 
 ```cmake
-# Add argman to your project
 add_subdirectory(path/to/argman)
-
-# Link to your executable
-target_link_libraries(your_app PRIVATE argman::argman)
+target_link_libraries(your_app PRIVATE argman)
 ```
 
 ### With FetchContent
@@ -146,29 +175,29 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(argman)
 
-target_link_libraries(your_app PRIVATE argman::argman)
+target_link_libraries(your_app PRIVATE argman)
 ```
 
 ### Build Example
 
 ```bash
-# Build the example (optional, off by default)
-cmake -B build -DARGMAN_BUILD_EXAMPLE=ON
-cmake --build build
+cmake --preset debug -DARGMAN_BUILD_EXAMPLE=ON
+cmake --build --preset debug
 
-# Run the example
-./build/bin/argman_example --help
+./cmake-build-debug/bin/argman_example --help
 ```
 
 ## Option Types
 
-| Type | Description | Example Values |
-|------|-------------|----------------|
-| `string` | Text values | `"hello"`, `"path/to/file"` |
-| `int` | Integer numbers | `42`, `-10`, `0` |
-| `bool` | Boolean flags | `true`, `false`, `1`, `0`, `yes`, `no` |
-| `float` | Floating point | `3.14`, `-2.5` |
-| `double` | Double precision | `3.141592653589793` |
+Options use type-safe default values: `Option("name", "description", default_value, is_flag)`.
+
+| Type | Default Example | Example Values |
+|------|-----------------|----------------|
+| `std::string` | `std::string("")` | `"hello"`, `"path/to/file"` |
+| `int` | `0`, `1`, `100` | `42`, `-10`, `0` |
+| `bool` | `false`, `true` | `true`, `false`, `1`, `0`, `yes`, `no` |
+| `float` | `0.0f`, `3.14f` | `3.14`, `-2.5` |
+| `double` | `0.0`, `3.14159` | `3.141592653589793` |
 
 ## Help System
 
@@ -176,19 +205,19 @@ ArgMan automatically generates help messages:
 
 ```bash
 $ myapp --help
-Usage: myapp [GLOBAL_OPTIONS] <COMMAND>
+Usage: myapp [OPTIONS] <SUBCOMMAND>
 
 My application
 
-Global Options:
+Options:
   --verbose        Enable verbose output
   --config <VALUE> Configuration file
 
-Commands:
+Subcommands:
   build  Build the project
   test   Test commands
 
-Use 'myapp <command> --help' for more information.
+Use 'myapp <subcommand> --help' for more information.
 
 $ myapp test --help
 Usage: myapp test <SUBCOMMAND>
@@ -203,5 +232,5 @@ Use 'myapp test <subcommand> --help' for more information.
 
 ## Requirements
 
-- **C++20** compatible compiler (GCC 10+, Clang 10+)
-- **CMake 3.20+**
+- **C++26** compatible compiler (Clang 16+ with module support)
+- **CMake 3.30+**
