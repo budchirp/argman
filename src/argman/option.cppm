@@ -5,6 +5,7 @@ module;
 #include <string>
 #include <type_traits>
 #include <variant>
+#include <vector>
 
 export module argman.option;
 
@@ -69,7 +70,15 @@ inline bool from_string<bool>(const std::string& str) {
     throw std::invalid_argument("invalid boolean value: " + str);
 }
 
-export using OptionValue = std::variant<std::string, int, bool, float, double>;
+template <typename T>
+struct is_vector : std::false_type {};
+
+template <typename T>
+struct is_vector<std::vector<T>> : std::true_type {};
+
+export using OptionValue =
+    std::variant<std::string, int, bool, float, double, std::vector<std::string>, std::vector<int>,
+                 std::vector<bool>, std::vector<float>, std::vector<double>>;
 
 export class Option {
   public:
@@ -82,11 +91,20 @@ export class Option {
         : name(std::move(name)), description(std::move(description)), is_flag(is_flag),
           value(std::move(value)) {}
 
+    bool is_list() const {
+        return std::visit([](const auto& v) { return is_vector<std::decay_t<decltype(v)>>::value; },
+                          value);
+    }
+
     void parse(const std::string& str) {
         std::visit(
             [&str](auto& out) {
                 using T = std::decay_t<decltype(out)>;
-                out = from_string<T>(str);
+                if constexpr (is_vector<T>::value) {
+                    out.push_back(from_string<typename T::value_type>(str));
+                } else {
+                    out = from_string<T>(str);
+                }
             },
             value);
     }

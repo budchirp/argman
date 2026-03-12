@@ -11,11 +11,10 @@
 
 ## Features
 
-- **Declarative API** - Define commands, options, and subcommands directly in class definitions
+- **Declarative API** - Define commands via a single `info()` override
 - **Subcommand Support** - Nested subcommands with individual options and help
 - **Type Safety** - Built-in support for `string`, `int`, `bool`, `float`, `double`
 - **Automatic Help** - Generated help messages for all commands and subcommands
-- **Global Options** - Options defined on the root command work across all commands
 - **Modern C++26** - Uses C++26 modules for clean, fast builds
 - **Static library** - Easy integration with CMake projects
 
@@ -30,14 +29,13 @@ import argman;
 
 class BuildCommand : public argman::Command {
 public:
-    std::string name() const override { return "build"; }
-    std::string description() const override { return "Build the project"; }
-
-    std::vector<argman::Option> init_options() const override {
-        return {
-            argman::Option("debug", "Enable debug mode", false, true),
-            argman::Option("jobs", "Number of parallel jobs", 1)
-        };
+    Info info() override {
+        return {.name = "build",
+                .description = "Build the project",
+                .options = {
+                    argman::Option("debug", "Enable debug mode", false, true),
+                    argman::Option("jobs", "Number of parallel jobs", 1),
+                }};
     }
 
     void execute() override {
@@ -52,14 +50,15 @@ private:
     BuildCommand build_command;
 
 public:
-    std::string name() const override { return "myapp"; }
-    std::string description() const override { return "My application"; }
-
-    void init() override {
-        add_command(build_command);
+    Info info() override {
+        return {.name = "myapp",
+                .description = "My application",
+                .commands = {&build_command}};
     }
 
-    void execute() override { show_help(); }
+    void execute() override {
+        std::println("Use --help for available commands.");
+    }
 };
 
 int main(int argc, char* argv[]) {
@@ -69,7 +68,7 @@ int main(int argc, char* argv[]) {
     try {
         parser.parse(argc, argv);
     } catch (const std::exception& e) {
-        std::println(stderr, "{}: error: {}", root.name(), e.what());
+        std::println(stderr, "{}: error: {}", root.info().name, e.what());
         return 1;
     }
 
@@ -82,14 +81,13 @@ int main(int argc, char* argv[]) {
 ```cpp
 class TestRunCommand : public argman::Command {
 public:
-    std::string name() const override { return "run"; }
-    std::string description() const override { return "Run unit tests"; }
-
-    std::vector<argman::Option> init_options() const override {
-        return {
-            argman::Option("verbose", "Verbose output", false, true),
-            argman::Option("filter", "Test filter pattern", std::string(""))
-        };
+    Info info() override {
+        return {.name = "run",
+                .description = "Run unit tests",
+                .options = {
+                    argman::Option("verbose", "Verbose output", false, true),
+                    argman::Option("filter", "Test filter pattern", std::string("")),
+                }};
     }
 
     void execute() override {
@@ -105,11 +103,10 @@ private:
     TestRunCommand run_command;
 
 public:
-    std::string name() const override { return "test"; }
-    std::string description() const override { return "Test commands"; }
-
-    void init() override {
-        add_command(run_command);
+    Info info() override {
+        return {.name = "test",
+                .description = "Test commands",
+                .commands = {&run_command}};
     }
 
     void execute() override {
@@ -127,22 +124,19 @@ private:
     TestCommand test_command;
 
 public:
-    std::string name() const override { return "myapp"; }
-    std::string description() const override { return "My application with global options"; }
-
-    std::vector<argman::Option> init_options() const override {
-        return {
-            argman::Option("verbose", "Enable verbose output", false, true),
-            argman::Option("config", "Configuration file", std::string("config.json"))
-        };
+    Info info() override {
+        return {.name = "myapp",
+                .description = "My application with global options",
+                .options = {
+                    argman::Option("verbose", "Enable verbose output", false, true),
+                    argman::Option("config", "Configuration file", std::string("config.json")),
+                },
+                .commands = {&build_command, &test_command}};
     }
 
-    void init() override {
-        add_command(build_command);
-        add_command(test_command);
+    void execute() override {
+        std::println("Use --help for available commands.");
     }
-
-    void execute() override { show_help(); }
 };
 
 int main(int argc, char* argv[]) {
