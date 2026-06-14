@@ -21,6 +21,9 @@ export class CommandLineParser {
         auto command_info = command.info();
 
         for (auto& option : command_info.options) {
+            for (const auto& alias : option.aliases) {
+                command.aliases[alias] = option.name;
+            }
             command.options.insert_or_assign(option.name, std::move(option));
         }
 
@@ -56,7 +59,18 @@ export class CommandLineParser {
         if (!command.options.empty()) {
             std::println("\nOptions:");
             for (const auto& [name, option] : command.options) {
-                std::print("  --{}", name);
+                if (!option.aliases.empty()) {
+                    for (size_t i = 0; i < option.aliases.size(); ++i) {
+                        std::print("  -{}", option.aliases[i]);
+                        if (i + 1 < option.aliases.size()) {
+                            std::print(",");
+                        }
+                    }
+                    std::print(", ");
+                } else {
+                    std::print("      ");
+                }
+                std::print("--{}", name);
                 if (!option.is_flag) {
                     if (option.is_list()) {
                         std::print(" <VALUES...>");
@@ -79,15 +93,37 @@ export class CommandLineParser {
         }
     }
 
+    void process_option(Command& current, const std::string& option_name, int& i, int argc,
+                        char* argv[]) {
+        auto it = current.options.find(option_name);
+        if (it == current.options.end()) {
+            throw std::invalid_argument("unknown option: " + option_name);
+        }
+
+        if (it->second.is_flag) {
+            it->second.set_flag();
+        } else if (it->second.is_list()) {
+            while (i + 1 < argc && !std::string(argv[i + 1]).starts_with("--") &&
+                   !std::string(argv[i + 1]).starts_with("-")) {
+                it->second.parse(argv[++i]);
+            }
+        } else {
+            if (i + 1 >= argc) {
+                throw std::invalid_argument("missing value for option: " + it->first);
+            }
+            it->second.parse(argv[++i]);
+        }
+    }
+
   public:
     CommandLineParser(Command& root) : root(&root) { initialize(root); }
 
-    void parse(int argc, char* argv[]) {
+    int parse(int argc, char* argv[]) {
         std::string program_name = argc > 0 ? argv[0] : "";
 
         if (argc < 2) {
             show_help(*root, program_name);
-            return;
+            return 0;
         }
 
         Command* current = root;
@@ -98,27 +134,18 @@ export class CommandLineParser {
 
             if (arg == "--help" || arg == "-h") {
                 show_help(*current, command_path);
-                return;
+                return 0;
             }
 
             if (arg.starts_with("--")) {
-                auto it = current->options.find(arg.substr(2));
-                if (it == current->options.end()) {
-                    throw std::invalid_argument("unknown option: " + arg.substr(2));
+                process_option(*current, arg.substr(2), i, argc, argv);
+            } else if (arg.starts_with("-") && arg.size() >= 2) {
+                std::string alias = arg.substr(1);
+                auto alias_it = current->aliases.find(alias);
+                if (alias_it == current->aliases.end()) {
+                    throw std::invalid_argument("unknown option: " + arg);
                 }
-
-                if (it->second.is_flag) {
-                    it->second.set_flag();
-                } else if (it->second.is_list()) {
-                    while (i + 1 < argc && !std::string(argv[i + 1]).starts_with("--")) {
-                        it->second.parse(argv[++i]);
-                    }
-                } else {
-                    if (i + 1 >= argc) {
-                        throw std::invalid_argument("missing value for option: " + it->first);
-                    }
-                    it->second.parse(argv[++i]);
-                }
+                process_option(*current, alias_it->second, i, argc, argv);
             } else {
                 auto* sub = find_subcommand(*current, arg);
                 if (!sub) {
@@ -129,7 +156,7 @@ export class CommandLineParser {
             }
         }
 
-        current->execute();
+        return current->execute();
     }
 };
 

@@ -23,12 +23,13 @@ export class Command {
 
   public:
     std::unordered_map<std::string, Option> options;
+    std::unordered_map<std::string, std::string> aliases;
 
     Command() = default;
     virtual ~Command() = default;
 
     virtual Info info() = 0;
-    virtual void execute() = 0;
+    virtual int execute() = 0;
 
     template <typename T>
     const T& get(const std::string& name) const {

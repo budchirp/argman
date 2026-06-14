@@ -84,12 +84,14 @@ export class Option {
   public:
     std::string name;
     std::string description;
+    std::vector<std::string> aliases;
     bool is_flag;
     OptionValue value;
 
-    Option(std::string name, std::string description, OptionValue value, bool is_flag = false)
-        : name(std::move(name)), description(std::move(description)), is_flag(is_flag),
-          value(std::move(value)) {}
+    Option(std::string name, std::string description, OptionValue value, bool is_flag = false,
+           std::vector<std::string> aliases = {})
+        : name(std::move(name)), description(std::move(description)), aliases(std::move(aliases)),
+          is_flag(is_flag), value(std::move(value)) {}
 
     bool is_list() const {
         return std::visit([](const auto& v) { return is_vector<std::decay_t<decltype(v)>>::value; },
